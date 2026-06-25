@@ -5,6 +5,7 @@ from difflib import get_close_matches
 
 import joblib
 import numpy as np
+import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
 from .config import ARTIFACT_DIR, ID_TO_LABEL, METADATA_PATH, MODEL_PATH
@@ -60,6 +61,20 @@ def train(force_download: bool = False) -> TrainingResult:
 
     model = _make_model()
     model.fit(x_train, y_train)
+
+
+    importance = (
+        pd.DataFrame(
+            {
+                "feature": feature_names,
+                "importance": model.feature_importances_,
+            }
+        )
+        .sort_values("importance", ascending=False)
+    )
+
+    print("\nTop 20 Features:")
+    print(importance.head(20).to_string(index=False))
 
     if len(x_test) > 0:
         probabilities = model.predict_proba(x_test)
