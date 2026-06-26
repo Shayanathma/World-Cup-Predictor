@@ -82,11 +82,22 @@ def _recent_stats(history: TeamHistory, window: int) -> dict[str, float]:
         }
     labels = [label for label, _ in matches]
     goal_diffs = [goal_diff for _, goal_diff in matches]
+    # Give more weight to recent matches.
+    # Oldest match gets weight 1, next 2, ..., newest gets weight = len(matches).
+    weights = np.arange(1, len(matches) + 1, dtype=float)
     return {
-        f"form_points_{window}": float(np.mean([_score_for_history(label) for label in labels])),
-        f"form_win_rate_{window}": float(sum(label == "win" for label in labels) / len(labels)),
-        f"form_draw_rate_{window}": float(sum(label == "draw" for label in labels) / len(labels)),
-        f"goal_diff_avg_{window}": float(np.mean(goal_diffs)),
+        f"form_points_{window}": float(
+            np.average([_score_for_history(label) for label in labels], weights=weights)
+        ),
+        f"form_win_rate_{window}": float(
+            np.average([label == "win" for label in labels], weights=weights)
+        ),
+        f"form_draw_rate_{window}": float(
+            np.average([label == "draw" for label in labels], weights=weights)
+        ),
+        f"goal_diff_avg_{window}": float(
+            np.average(goal_diffs, weights=weights)
+        ),
         f"matches_played_{window}": float(len(matches)),
     }
 

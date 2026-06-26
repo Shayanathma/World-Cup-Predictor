@@ -7,6 +7,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
+from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 
 from .config import ARTIFACT_DIR, ID_TO_LABEL, METADATA_PATH, MODEL_PATH
 from .data import load_dataset
@@ -60,8 +61,49 @@ def train(force_download: bool = False) -> TrainingResult:
     y_train, y_test = target.iloc[:split], target.iloc[split:]
 
     model = _make_model()
-    model.fit(x_train, y_train)
 
+    param_dist = {
+        "n_estimators": [200, 300, 400, 500],
+        "learning_rate": [0.01, 0.03, 0.05, 0.1],
+        "max_depth": [3, 4, 5, 6],
+        "min_child_weight": [1, 3, 5],
+        "subsample": [0.7, 0.8, 0.9, 1.0],
+        "colsample_bytree": [0.7, 0.8, 0.9, 1.0],
+        "gamma": [0, 0.1, 0.3, 0.5],
+    }
+
+    tscv = TimeSeriesSplit(n_splits=5)
+
+    print("\n========== Hyperparameter Tuning ==========")
+    print(f"Training samples           : {len(x_train)}")
+    print("TimeSeriesSplit folds      : 5")
+    print("Random parameter sets      : 25")
+    print("Total CV model fits        : 125")
+    print("Scoring metric             : Negative Log Loss")
+    print("===========================================\n")
+
+    search = RandomizedSearchCV(
+        estimator=model,
+        param_distributions=param_dist,
+        n_iter=25,
+        scoring="neg_log_loss",
+        cv=tscv,
+        random_state=42,
+        n_jobs=-1,
+        verbose=3,
+        return_train_score=True,
+    )
+
+    search.fit(x_train, y_train)
+
+    print("\n========== Hyperparameter Tuning Complete ==========")
+    print(f"Best CV Log Loss : {-search.best_score_:.4f}")
+    print("Best Parameters:")
+    for key, value in search.best_params_.items():
+        print(f"  {key}: {value}")
+    print("====================================================\n")
+
+    model = search.best_estimator_
 
     importance = (
         pd.DataFrame(
